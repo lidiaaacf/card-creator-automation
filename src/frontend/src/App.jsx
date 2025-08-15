@@ -1,11 +1,6 @@
-import Inicio from './pages/Inicio';
+import React from 'react'
+import Inicio from './Inicio.jsx'
 
-function App() {
-  return (
-    <div>
-      <Inicio />
-    </div>
-  );
+export default function App() {
+  return <Inicio />
 }
-
-export default App;

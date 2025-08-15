@@ -1,8 +1,10 @@
 import React from "react";
 import { Calendar, User } from "lucide-react";
+import Select from "./components/Select";
 import { motion } from "framer-motion";
 
-export default function Inicio() {
+export default function Inicio({ issue, projects }) {
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white p-4">
       {/* Top Navbar */}
@@ -12,7 +14,8 @@ export default function Inicio() {
         transition={{ duration: 0.5 }}
         className="flex items-center justify-between bg-black/40 rounded-2xl p-4 mb-6 shadow-lg"
       >
-        <div className="text-2xl font-bold text-orange-500">DataSelf</div>
+        <Select options={projects} />
+        {/* <div className="text-2xl font-bold text-orange-500">DataSelf</div> */}
         <div className="flex items-center gap-3">
           {["Marcações", "Minhas Issues", "Templates"].map((item, idx) => (
             <motion.button
@@ -76,13 +79,13 @@ export default function Inicio() {
                     transition={{ delay: 0.4 + i * 0.05 }}
                     className="hover:bg-white/5 transition"
                   >
-                    <td className="px-4 py-3">#{i + 1}</td>
-                    <td className="px-4 py-3">Médio</td>
-                    <td className="px-4 py-3">Bug</td>
-                    <td className="px-4 py-3">Tela X</td>
-                    <td className="px-4 py-3">Usuário {i + 1}</td>
-                    <td className="px-4 py-3">01/01/2025</td>
-                    <td className="px-4 py-3">Aberto</td>
+                    <td className="px-4 py-3">{issue.id}</td>
+                    <td className="px-4 py-3">{issue.complexity}</td>
+                    <td className="px-4 py-3">{issue.type}</td>
+                    <td className="px-4 py-3">{issue.screen}</td>
+                    <td className="px-4 py-3">{issue.creator}</td>
+                    <td className="px-4 py-3">{issue.open ? 'Sim' : 'Não'}</td>
+                    <td className="px-4 py-3">{issue.status}</td>
                     <td className="px-4 py-3">
                       <button className="text-orange-500 hover:underline">Editar</button>
                     </td>

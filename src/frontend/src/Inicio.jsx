@@ -5,6 +5,9 @@ import Acoes from "./components/Acoes"
 import { motion } from "framer-motion";
 
 export default function Inicio() {
+  const URL_ISSUES = import.meta.env.VITE_ISSUES_GITLAB;
+  const URL_PROJETOS = import.meta.env.VITE_PROJETOS_GITLAB;
+
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState([]);
@@ -14,7 +17,7 @@ export default function Inicio() {
   useEffect(() => {
     (async () => {
       try {
-        const resp = await fetch("http://localhost:8080/get-projects/");
+        const resp = await fetch(URL_PROJETOS);
         if (!resp.ok) throw new Error("Erro ao buscar projetos");
         const data = await resp.json();
         setProjects(data);
@@ -34,7 +37,7 @@ export default function Inicio() {
     (async () => {
       try {
         const resp = await fetch(
-          `http://localhost:8080/get-automation-issues/?project_id=${selectedProject.id}`
+          `${URL_ISSUES}/?project_id=${selectedProject.id}`
         );
         if (!resp.ok) throw new Error("Erro ao buscar issues");
         const data = await resp.json();
@@ -190,7 +193,7 @@ export default function Inicio() {
                         <td className="px-4 py-3">{created ? "Sim" : "Não"}</td>
                         <td className="px-4 py-3">{status || "-"}</td>
                         <td className="px-4 py-3">
-                          <Acoes/>
+                          <Acoes issue={issue} onAction={(action, data) => console.log(action, data)} />
                         </td>
                       </motion.tr>
                     );

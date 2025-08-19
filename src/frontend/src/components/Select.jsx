@@ -1,22 +1,23 @@
-import React, { useState } from "react";
+import React from "react";
 import { Listbox } from "@headlessui/react";
 
-export default function Select({ options = [] }) {
-    const [selected, setSelected] = useState(options[0] || "");
+export default function Select({ options = [], value = null, onChange }) {
+    const label = value?.name || "Projetos";
 
     return (
-        <Listbox value={selected} onChange={setSelected}>
+        <Listbox value={value} onChange={onChange}>
             <Listbox.Button className="text-2xl font-bold text-orange-500">
-                {selected || "Selecione..."}
+                {label}
             </Listbox.Button>
+
             <Listbox.Options className="bg-gray-800 mt-1 rounded-lg shadow-lg">
-                {options.map((option) => (
+                {options.map((opt) => (
                     <Listbox.Option
-                        key={option}
-                        value={option}
+                        key={opt.id}
+                        value={opt}
                         className="cursor-pointer px-4 py-2 hover:bg-orange-500/10"
                     >
-                        {option}
+                        {opt.name}
                     </Listbox.Option>
                 ))}
             </Listbox.Options>

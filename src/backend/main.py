@@ -1,9 +1,11 @@
 import os
 import gitlab
 import cohere
+from fastapi import Query
 from fastapi import FastAPI
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 
@@ -15,7 +17,15 @@ COHERE_API_KEY = os.getenv("COHERE_API_KEY")
 co = cohere.ClientV2(COHERE_API_KEY)
 gl = gitlab.Gitlab(GITLAB_URL, private_token=PRIVATE_TOKEN)
 
-app = FastAPI()
+app = FastAPI() 
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:8080"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class IssueRequest(BaseModel):
     name: str              # Título da issue
@@ -28,6 +38,9 @@ class IssueRequest(BaseModel):
 
 @app.post("/create-issue/")
 def create_issue(data: IssueRequest):
+    """
+    Cria issues de acordo com o template padrão e via parâmetros passados.
+    """
     if " " in data.issue_type:
         tipo_issue_md = f"{data.issue_type}"
     else:
@@ -44,7 +57,7 @@ def create_issue(data: IssueRequest):
 
     ### LOCAL ###
     - Grupo: {data.client}  
-    - Link: https://dataself.com.br/{data.screen}
+    - Link: https://dataself.com.br/{data.screen} 
 
     ### NÃO CONFORMIDADE ###
     Descreva detalhadamente a inconformidade, mantendo a formatação Markdown.  
@@ -76,9 +89,32 @@ def create_issue(data: IssueRequest):
     labels_list = [data.complexity, "QA", data.issue_type, "Ready"]
 
     issue = project.issues.create({
-        "title": f"{data.issue_type.upper()} - {data.name}",
+        "title": f"{data.name}",
         "description": description,
         "labels": labels_list
     })
 
-    return {"message": "Issue criada com sucesso", "url": issue.web_url}
+    return {"message": "Issue criada com sucesso", "url": issue.web_url}  
+
+@app.get("/get-automation-issues/")
+def get_automation_issues(project_id: int = Query(..., description="ID do projeto")):
+    """
+    Retorna apenas as issues criadas pelo token atual (automação).
+    """
+    project = gl.projects.get(project_id)
+    issues = project.issues.list(scope="created_by_me", all=True)
+
+    return [issue.attributes for issue in issues]
+
+
+@app.get("/get-projects/")
+def get_projects():
+    try:
+        projects = gl.projects.list(owned=True, membership=True, all=True)  # 🔑 owned/membership
+        project_list = [
+            {"id": p.id, "name": p.name, "web_url": p.web_url}
+            for p in projects
+        ]
+        return project_list
+    except Exception as e:
+        return {"error": str(e)}

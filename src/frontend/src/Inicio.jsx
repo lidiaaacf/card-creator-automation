@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Calendar, User } from "lucide-react";
 import Select from "./components/Select";
+import Acoes from "./components/Acoes"
 import { motion } from "framer-motion";
 
 export default function Inicio() {
@@ -189,7 +190,7 @@ export default function Inicio() {
                         <td className="px-4 py-3">{created ? "Sim" : "Não"}</td>
                         <td className="px-4 py-3">{status || "-"}</td>
                         <td className="px-4 py-3">
-                          <button className="text-orange-500 hover:underline">Editar</button>
+                          <Acoes/>
                         </td>
                       </motion.tr>
                     );
@@ -215,6 +216,31 @@ export default function Inicio() {
             <div className="flex items-center gap-2">
               <Calendar size={18} />
               <span>01/01/2025</span>
+            </div>
+          </div>
+          <div className="bg-black/40 p-6 rounded-xl shadow-lg text-center">
+            <div className="text-3xl font-bold">128</div>
+            <div className="text-gray-400 text-sm">issues criadas</div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-black/40 p-6 rounded-xl shadow-lg text-center">
+              <div className="text-2xl font-bold text-orange-500">24%</div>
+              <div className="text-gray-400 text-xs">issues fechadas</div>
+            </div>
+            <div className="bg-black/40 p-6 rounded-xl shadow-lg text-center">
+              <div className="text-2xl font-bold text-orange-500">78%</div>
+              <div className="text-gray-400 text-xs">issues fechadas</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-black/40 p-6 rounded-xl shadow-lg text-center">
+              <div className="text-2xl font-bold text-orange-500">41</div>
+              <div className="text-gray-400 text-xs">issues fechadas</div>
+            </div>
+            <div className="bg-black/40 p-6 rounded-xl shadow-lg text-center">
+              <div className="text-2xl font-bold text-orange-500">68</div>
+              <div className="text-gray-400 text-xs">issues fechadas</div>
             </div>
           </div>
         </motion.div>

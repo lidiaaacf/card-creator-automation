@@ -5,6 +5,7 @@ from fastapi import Query
 from fastapi import FastAPI
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from database import router as database_router
 from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
@@ -14,10 +15,11 @@ PRIVATE_TOKEN = os.getenv("GITLAB_TOKEN")
 PROJECT_ID = int(os.getenv("GITLAB_PROJECT_ID"))
 COHERE_API_KEY = os.getenv("COHERE_API_KEY")
 
+app = FastAPI() 
+
 co = cohere.ClientV2(COHERE_API_KEY)
 gl = gitlab.Gitlab(GITLAB_URL, private_token=PRIVATE_TOKEN)
-
-app = FastAPI() 
+app.include_router(database_router, prefix="/db")
 
 app.add_middleware(
     CORSMiddleware,
@@ -117,4 +119,4 @@ def get_projects():
         ]
         return project_list
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": str(e)} 

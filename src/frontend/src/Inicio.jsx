@@ -2,17 +2,26 @@ import React, { useState, useEffect } from "react";
 import { Calendar, User } from "lucide-react";
 import Select from "./components/Select";
 import Acoes from "./components/Acoes"
+import IssueFormModal from "./components/CriaIssue";
 import { motion } from "framer-motion";
+import { useToast } from "./components/ui/use-toast";
 
 export default function Inicio() {
   const URL_ISSUES = import.meta.env.VITE_ISSUES_GITLAB;
   const URL_PROJETOS = import.meta.env.VITE_PROJETOS_GITLAB;
+  const URL_CRIA_ISSUE = import.meta.env.VITE_CRIA_ISSUE;
 
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState([]);
   const [created, setCreated] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
+  const [showFavorites, setShowFavorites] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showModal, setShowModal] = useState(false);
+  const [localIssues, setLocalIssues] = useState([]);
+
+  const { addToast } = useToast();
 
   useEffect(() => {
     (async () => {
@@ -53,7 +62,7 @@ export default function Inicio() {
   }, [selectedProject?.id]);
 
   function parseLabels(labels) {
-    let peso = null;
+    let weight = null;
     let type = null;
     let status = null;
 
@@ -62,7 +71,7 @@ export default function Inicio() {
 
     labels.forEach((label) => {
       if (/^\d+$/.test(label)) {
-        peso = parseInt(label, 10);
+        weight = parseInt(label, 10);
       } else if (tipos.includes(label.toLowerCase())) {
         type = label;
       } else if (statusList.includes(label.toLowerCase())) {
@@ -70,7 +79,7 @@ export default function Inicio() {
       }
     });
 
-    return { peso, type, status };
+    return { weight, type, status };
   }
 
   function parseScreen(description) {
@@ -98,6 +107,51 @@ export default function Inicio() {
     }
   }
 
+  function searchIssue(issue) {
+    if (!searchTerm.trim()) return true;
+    const term = searchTerm.toLowerCase();
+
+    return (
+      issue.iid?.toString().includes(term) ||
+      issue.title?.toLowerCase().includes(term) ||
+      issue.description?.toLowerCase().includes(term) ||
+      issue.author?.username?.toLowerCase().includes(term) ||
+      (issue.labels || []).some((label) => label.toLowerCase().includes(term))
+    );
+  }
+
+  const handleNewIssue = async (issueData) => {
+    try {
+      const payload = {
+        projeto: selectedProject.id.toString(), 
+        name: issueData.title, 
+        context: issueData.context,
+        weight: Number(issueData.weight), 
+        issue_type: issueData.type,
+        client: issueData.client,
+        screen: issueData.screen,
+        // screenshot_url: 
+      };
+
+      console.log("Payload enviado:", payload);
+
+      const res = await fetch(URL_CRIA_ISSUE, {
+        method: "POST",
+        body: JSON.stringify(payload),
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (res.ok) {
+        addToast({ id: Date.now(), message: "Issue enviada para o Gitlab!" });
+      } else {
+        addToast({ id: Date.now(), message: "Erro ao enviar issue para Gitlab." });
+      }
+    } catch (err) {
+      addToast({ id: Date.now(), message: `Erro: ${err}` });
+      console.error(err);
+    }
+  };
+
   if (loading) return <p className="text-white">Carregando...</p>;
 
   return (
@@ -114,15 +168,29 @@ export default function Inicio() {
           onChange={setSelectedProject}
         />
         <div className="flex items-center gap-3">
-          {["Marcações", "Minhas Issues", "Templates"].map((item) => (
-            <motion.button
-              key={item}
-              whileHover={{ scale: 1.05 }}
-              className="px-4 py-1 rounded-full border border-orange-500 text-sm hover:bg-orange-500/10"
-            >
-              {item}
-            </motion.button>
-          ))}
+          {["Favoritas", "Minhas Issues", "Templates"].map((item) => {
+            const isFavorites = item === "Favoritas";
+            const isActive = isFavorites && showFavorites;
+
+            return (
+              <motion.button
+                key={item}
+                whileHover={{ scale: 1.05 }}
+                className={`px-4 py-1 rounded-full border text-sm transition 
+        ${isActive
+                    ? "bg-orange-600 text-white border-orange-600"
+                    : "border-orange-500 text-orange-500 hover:bg-orange-500/10"
+                  }`}
+                onClick={() => {
+                  if (isFavorites) {
+                    setShowFavorites((prev) => !prev);
+                  }
+                }}
+              >
+                {isFavorites ? (showFavorites ? "Todas" : "Favoritas") : item}
+              </motion.button>
+            );
+          })}
           <div className="p-2 rounded-full bg-orange-600 hover:bg-orange-500 cursor-pointer">
             <User size={20} />
           </div>
@@ -137,12 +205,22 @@ export default function Inicio() {
             transition={{ delay: 0.2 }}
             className="flex gap-3 mb-6"
           >
-            <button className="bg-orange-600 hover:bg-orange-500 px-5 py-2 rounded-lg font-semibold shadow-md">
+            <button 
+              className="bg-orange-600 hover:bg-orange-500 px-5 py-2 rounded-lg font-semibold shadow-md"
+              onClick={() => setShowModal(true)}
+            >
               Cadastrar nova issue
             </button>
+            <IssueFormModal
+              isOpen={showModal}
+              onClose={() => setShowModal(false)}
+              onSubmit={handleNewIssue}
+            />
             <input
               type="text"
               placeholder="Pesquisar issue"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="bg-gray-800 text-white px-4 py-2 rounded-lg w-64 outline-none focus:ring focus:ring-orange-500/50"
             />
             <button className="bg-orange-600 hover:bg-orange-500 px-5 py-2 rounded-lg font-semibold shadow-md">
@@ -173,32 +251,34 @@ export default function Inicio() {
                     )}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-800">
-                  {issues.map((issue, i) => {
-                    const { peso, type, status } = parseLabels(issue.labels || []);
-                    const screen = parseScreen(issue.description);
-                    return (
-                      <motion.tr
-                        key={issue.id || i}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.4 + i * 0.05 }}
-                        className="hover:bg-white/5 transition"
-                      >
-                        <td className="px-4 py-3">{issue.iid}</td>
-                        <td className="px-4 py-3">{peso || "-"}</td>
-                        <td className="px-4 py-3">{type || "-"}</td>
-                        <td className="px-4 py-3">{screen || "-"}</td>
-                        <td className="px-4 py-3">{issue.author.username || "-"}</td>
-                        <td className="px-4 py-3">{created ? "Sim" : "Não"}</td>
-                        <td className="px-4 py-3">{status || "-"}</td>
-                        <td className="px-4 py-3">
-                          <Acoes issue={issue} onAction={(action, data) => console.log(action, data)} />
-                        </td>
-                      </motion.tr>
-                    );
-                  })}
-                </tbody>
+                  <tbody className="divide-y divide-gray-800">
+                    {(showFavorites ? issues.filter((issue) => issue.favorited) : issues)
+                      .filter(searchIssue)
+                      .map((issue, i) => {
+                        const { weight, type, status } = parseLabels(issue.labels || []);
+                        const screen = parseScreen(issue.description);
+                        return (
+                          <motion.tr
+                            key={issue.id || i}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.4 + i * 0.05 }}
+                            className="hover:bg-white/5 transition"
+                          >
+                            <td className="px-4 py-3">{issue.iid}</td>
+                            <td className="px-4 py-3">{weight || "-"}</td>
+                            <td className="px-4 py-3">{type || "-"}</td>
+                            <td className="px-4 py-3">{screen || "-"}</td>
+                            <td className="px-4 py-3">{issue.author.username || "-"}</td>
+                            <td className="px-4 py-3">{created ? "Sim" : "Não"}</td>
+                            <td className="px-4 py-3">{status || "-"}</td>
+                            <td className="px-4 py-3">
+                              <Acoes issue={issue} onAction={(action, data) => console.log(action, data)} />
+                            </td>
+                          </motion.tr>
+                        );
+                      })}
+                  </tbody>
               </table>
             )}
           </motion.div>

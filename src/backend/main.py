@@ -1,12 +1,14 @@
 import os
 import gitlab
 import cohere
+import sqlite3 
 from fastapi import Query
 from fastapi import FastAPI
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from database import router as database_router
 from fastapi.middleware.cors import CORSMiddleware
+from database import Session, get_db, IssueLocal, Depends
 
 load_dotenv()
 
@@ -35,11 +37,11 @@ class IssueRequest(BaseModel):
     projeto: str           # Projeto onde a issue será criada
     name: str              # Título da issue
     context: str           # Contexto da inconformidade
-    complexity: int        # Peso (1, 2, 3, 5, 8, 13)
+    weight: int            # Peso (1, 2, 3, 5, 8, 13)
     issue_type: str        # Label principal (Bug levantado, New feature, Ajuste, )
     client: str            # Nome do grupo/cliente 
     screen: str            # Tela afetada
-    screenshot_url: str    # Screenshot mostrando a inconformidade
+    # screenshot_url: str    # Screenshot mostrando a inconformidade
 
 @app.post("/create-issue/")
 def create_issue(data: IssueRequest):
@@ -58,16 +60,14 @@ def create_issue(data: IssueRequest):
     {data.context} (Aqui nessa sessão pode melhorar o detalhamento do contexto porém de forma breve)
 
     ### TIPO DE ISSUE ###
-    ~{data.complexity}  ~QA  ~{tipo_issue_md}
+    ~{data.weight}  ~QA  ~{tipo_issue_md}
 
     ### LOCAL ###
     - Grupo: {data.client}  
     - Link: https://dataself.com.br/{data.screen} 
 
     ### NÃO CONFORMIDADE ###
-    Descreva detalhadamente a inconformidade, mantendo a formatação Markdown.  
-    Inclua também o screenshot no seguinte formato: 
-    ![Screenshot]({data.screenshot_url})
+    Descreva detalhadamente a inconformidade, mantendo a formatação Markdown.   
 
     ### AÇÕES ESPERADAS ###
     Liste os passos esperados para resolver a inconformidade em formato de checkbox
@@ -91,7 +91,7 @@ def create_issue(data: IssueRequest):
 
     project = gl.projects.get(project)
     
-    labels_list = [data.complexity, "QA", data.issue_type, "Ready"]
+    labels_list = [data.weight, "QA", data.issue_type, "Ready"]
 
     issue = project.issues.create({
         "title": f"{data.name}",
@@ -102,14 +102,24 @@ def create_issue(data: IssueRequest):
     return {"message": "Issue criada com sucesso", "url": issue.web_url}  
 
 @app.get("/get-automation-issues/")
-def get_automation_issues(project_id: int = Query(..., description="ID do projeto")):
-    """
-    Retorna apenas as issues criadas pelo token atual (automação).
-    """
+def get_automation_issues(project_id: int = Query(..., description="ID do projeto"), db: Session = Depends(get_db)):
     project = gl.projects.get(project_id)
     issues = project.issues.list(scope="created_by_me", all=True)
 
-    return [issue.attributes for issue in issues]
+    favorites = {
+        issue.gitlab_id for issue in db.query(IssueLocal).filter(
+            IssueLocal.project_id == project_id,
+            IssueLocal.favorited == True
+        ).all()
+    }
+
+    response = []
+    for issue in issues:
+        data = issue.attributes.copy()
+        data["favorited"] = issue.iid in favorites
+        response.append(data)
+
+    return response
 
 
 @app.get("/get-projects/")

@@ -1,7 +1,6 @@
 import os
 import gitlab
 import cohere
-import sqlite3 
 from fastapi import Query
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -17,7 +16,7 @@ PRIVATE_TOKEN = os.getenv("GITLAB_TOKEN")
 PROJECT_ID = int(os.getenv("GITLAB_PROJECT_ID"))
 COHERE_API_KEY = os.getenv("COHERE_API_KEY")
 LOCAL_FRONT = os.getenv("LOCAL_FRONT")
-LOCAL_BACK = os.getenv("LOCAL_BACK")
+IP_FRONT = os.getenv("IP_FRONT")
 
 app = FastAPI() 
 
@@ -27,14 +26,17 @@ app.include_router(database_router, prefix="/db")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[LOCAL_FRONT, LOCAL_BACK],
+    allow_origins=[
+        LOCAL_FRONT,
+        IP_FRONT
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 class IssueRequest(BaseModel):
-    projeto: str           # Projeto onde a issue será criada
+    project: str           # Projeto onde a issue será criada
     name: str              # Título da issue
     context: str           # Contexto da inconformidade
     weight: int            # Peso (1, 2, 3, 5, 8, 13)
@@ -89,7 +91,7 @@ def create_issue(data: IssueRequest):
     else:
         raise ValueError(f"Unexpected Cohere response format: {response}")
 
-    project = gl.projects.get(project)
+    project = gl.projects.get(data.project)
     
     labels_list = [data.weight, "QA", data.issue_type, "Ready"]
 

@@ -123,7 +123,7 @@ export default function Inicio() {
   const handleNewIssue = async (issueData) => {
     try {
       const payload = {
-        projeto: selectedProject.id.toString(), 
+        project: selectedProject.id.toString(), 
         name: issueData.title, 
         context: issueData.context,
         weight: Number(issueData.weight), 

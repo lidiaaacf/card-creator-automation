@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 from database import router as database_router
 from fastapi.middleware.cors import CORSMiddleware
-from database import Session, get_db, IssueLocal, Depends
+from database import Session, get_db, IssueGitlab, Depends
 
 load_dotenv()
 
@@ -101,7 +101,7 @@ def create_issue(data: IssueRequest):
         "labels": labels_list
     })
 
-    return {"message": "Issue criada com sucesso", "url": issue.web_url}  
+    return {"message": "Issue criada com sucesso", "url": issue.web_url}   
 
 @app.get("/get-automation-issues/")
 def get_automation_issues(project_id: int = Query(..., description="ID do projeto"), db: Session = Depends(get_db)):
@@ -109,9 +109,9 @@ def get_automation_issues(project_id: int = Query(..., description="ID do projet
     issues = project.issues.list(scope="created_by_me", all=True)
 
     favorites = {
-        issue.gitlab_id for issue in db.query(IssueLocal).filter(
-            IssueLocal.project_id == project_id,
-            IssueLocal.favorited == True
+        issue.gitlab_id for issue in db.query(IssueGitlab).filter(
+            IssueGitlab.project_id == project_id,
+            IssueGitlab.favorited == True
         ).all()
     }
 

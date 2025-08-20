@@ -1,8 +1,9 @@
 import os
-from sqlalchemy import create_engine, Column, Integer, Boolean, DateTime
+from sqlalchemy import create_engine, Column, Integer, Boolean, DateTime, String, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from datetime import datetime
+from pydantic import BaseModel
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends
 
@@ -22,19 +23,122 @@ def get_db():
     finally:
         db.close()
 
-# ---------- MODELO ----------
-class IssueLocal(Base):
-    __tablename__ = "issues"
+# ---------- MODELO - ISSUES VINDAS DO GITLAB ----------
+class IssueGitlab(Base):
+    __tablename__ = "issues_gitlab"
     id = Column(Integer, primary_key=True, index=True)
     gitlab_id = Column(Integer, unique=True, nullable=False)
     project_id = Column(Integer, nullable=False)
+    favorited = Column(Boolean, default=False)
+    sent = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow) 
+
+# ---------- MODELO - ISSUES SOMENTE LOCAL ----------
+class IssueLocal(Base):
+    __tablename__ = "issues_local"
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, nullable=False)
+    name = Column(String, nullable=False)
+    context = Column(Text, nullable=True)
+    weight = Column(Integer, nullable=True)
+    issue_type = Column(String, nullable=True)
+    client = Column(String, nullable=True)
+    screen = Column(String, nullable=True)
     favorited = Column(Boolean, default=False)
     sent = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 Base.metadata.create_all(bind=engine)
 
-# ---------- ROTAS ----------
+class IssueLocalRequest(BaseModel):
+    project: str
+    name: str
+    context: str
+    weight: int
+    issue_type: str
+    client: str
+    screen: str
+
+# ---------- ROTAS LOCAL ----------
+@router.post("/issues/local")
+def save_local_issue(data: IssueLocalRequest, db: Session = Depends(get_db)):
+    issue = IssueLocal(
+        project_id=data.project,
+        name=data.name,
+        context=data.context,
+        weight=data.weight,
+        issue_type=data.issue_type,
+        client=data.client,
+        screen=data.screen,
+        sent=False
+    )
+    db.add(issue)
+    db.commit()
+    db.refresh(issue)
+    return {"message": "Issue salva localmente", "id": issue.id}
+
+@router.put("/issues/local/{local_id}")
+def edit_local_issue(local_id: int, data: IssueLocalRequest, db: Session = Depends(get_db)):
+    issue = db.query(IssueLocal).filter(IssueLocal.id == local_id).first()
+    if not issue:
+        return {"error": "Issue local não encontrada"}
+
+    issue.name = data.name
+    issue.context = data.context
+    issue.weight = data.weight
+    issue.issue_type = data.issue_type
+    issue.client = data.client
+    issue.screen = data.screen
+
+    db.commit()
+    db.refresh(issue)
+    return {"message": "Issue local atualizada", "id": issue.id}
+
+@router.post("/issues/local/{local_id}/send")
+def send_local_issue(local_id: int, db: Session = Depends(get_db)):
+    issue = db.query(IssueLocal).filter(IssueLocal.id == local_id).first()
+    if not issue:
+        return {"error": "Issue local não encontrada"}
+
+    project = gl.projects.get(issue.project_id)
+    
+    gitlab_issue = project.issues.create({
+        "title": issue.name,
+        "description": issue.context,
+        "labels": [str(issue.weight), "QA", issue.issue_type, "Ready"]
+    })
+
+    issue.gitlab_id = gitlab_issue.iid
+    issue.sent = True
+    db.commit()
+    db.refresh(issue)
+
+    return {"message": "Issue enviada ao GitLab", "gitlab_id": issue.gitlab_id}
+
+@router.delete("/issues/local/{local_id}")
+def delete_local_issue(local_id: int, db: Session = Depends(get_db)):
+    issue = db.query(IssueLocal).filter(IssueLocal.id == local_id).first()
+    if not issue:
+        return {"error": "Issue local não encontrada"}
+    db.delete(issue)
+    db.commit()
+    return {"message": f"Issue local {local_id} deletada"}
+
+@router.post("/issues/{origin}/{project_id}/{gitlab_id}/favorite")
+def favorite_issue(origin: str, project_id: int, gitlab_id: int, db: Session = Depends(get_db)):
+    if origin == "local":
+        issue = db.query(IssueLocal).filter(IssueLocal.id == gitlab_id).first()
+    else:  # "gitlab"
+        issue = db.query(IssueGitlab).filter(IssueGitlab.gitlab_id == gitlab_id,
+                                            IssueGitlab.project_id == project_id).first()
+    if not issue:
+        return {"error": "Issue não encontrada"}
+    issue.favorited = not issue.favorited
+    db.commit()
+    db.refresh(issue)
+    return {"favorited": issue.favorited}
+
+# ---------- ROTAS GITLAB ----------
 @router.post("/issues/{project_id}/{gitlab_id}/favorite")
 def favorite_issue(
     project_id: int,
@@ -42,10 +146,10 @@ def favorite_issue(
     db: Session = Depends(get_db)
     ):
     
-    issue = (db.query(IssueLocal).filter(IssueLocal.gitlab_id == gitlab_id,IssueLocal.project_id == project_id).first())
+    issue = (db.query(IssueGitlab).filter(IssueGitlab.gitlab_id == gitlab_id,IssueGitlab.project_id == project_id).first())
 
     if not issue:
-        issue = IssueLocal(gitlab_id=gitlab_id, project_id=project_id)
+        issue = IssueGitlab(gitlab_id=gitlab_id, project_id=project_id)
 
     issue.favorited = not issue.favorited
     db.add(issue)
@@ -60,7 +164,7 @@ def get_issue_details(
     db: Session = Depends(get_db)
     ):
     
-    issue = (db.query(IssueLocal).filter(IssueLocal.gitlab_id == gitlab_id,IssueLocal.project_id == project_id).first())
+    issue = (db.query(IssueGitlab).filter(IssueGitlab.gitlab_id == gitlab_id,IssueGitlab.project_id == project_id).first())
     
     if not issue:
         return {"error": "Issue não encontrada"}
@@ -71,34 +175,3 @@ def get_issue_details(
         "sent": issue.sent,
         "created_at": issue.created_at
     }
-
-@router.post("/issues/{project_id}/{gitlab_id}/send")
-def send_issue(
-    project_id: int,
-    gitlab_id: int,
-    db: Session = Depends(get_db)
-    ):
-    
-    issue = (db.query(IssueLocal).filter(IssueLocal.gitlab_id == gitlab_id,IssueLocal.project_id == project_id).first())
-    
-    if not issue:
-        return {"error": "Issue não encontrada"}
-    issue.sent = True
-    db.commit()
-    db.refresh(issue)
-    return {"gitlab_id": gitlab_id, "sent": issue.sent}
-
-@router.delete("/issues/{project_id}/{gitlab_id}")
-def delete_issue(
-    project_id: int,
-    gitlab_id: int,
-    db: Session = Depends(get_db)
-    ):
-    
-    issue = (db.query(IssueLocal).filter(IssueLocal.gitlab_id == gitlab_id,IssueLocal.project_id == project_id).first())
-    
-    if not issue:
-        return {"error": "Issue não encontrada"}
-    db.delete(issue)
-    db.commit()
-    return {"message": f"Issue {gitlab_id} deletada do banco local"}

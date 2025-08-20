@@ -1,15 +1,15 @@
-import os
+import os, requests
 from sqlalchemy import create_engine, Column, Integer, Boolean, DateTime, String, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from datetime import datetime
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
-
+CREATE_ISSUE_URL = os.getenv("LOCAL_BACK") + "/create-issue/"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 Base = declarative_base()
@@ -94,26 +94,34 @@ def edit_local_issue(local_id: int, data: IssueLocalRequest, db: Session = Depen
     db.refresh(issue)
     return {"message": "Issue local atualizada", "id": issue.id}
 
-@router.post("/issues/local/{local_id}/send")
-def send_local_issue(local_id: int, db: Session = Depends(get_db)):
-    issue = db.query(IssueLocal).filter(IssueLocal.id == local_id).first()
+@router.post("/issues/local/{issue_id}/send")
+def send_local_issue(issue_id: int, db: Session = Depends(get_db)):
+    issue = db.query(IssueLocal).filter(IssueLocal.id == issue_id).first()
     if not issue:
-        return {"error": "Issue local não encontrada"}
+        raise HTTPException(status_code=404, detail="Issue não encontrada")
 
-    project = gl.projects.get(issue.project_id)
-    
-    gitlab_issue = project.issues.create({
-        "title": issue.name,
-        "description": issue.context,
-        "labels": [str(issue.weight), "QA", issue.issue_type, "Ready"]
-    })
+    payload = {
+        "project": str(issue.project_id),
+        "name": issue.name,
+        "context": issue.context,
+        "weight": issue.weight,
+        "issue_type": issue.issue_type,
+        "client": issue.client,
+        "screen": issue.screen,
+    }
 
-    issue.gitlab_id = gitlab_issue.iid
-    issue.sent = True
-    db.commit()
-    db.refresh(issue)
+    try:
+        resp = requests.post(CREATE_ISSUE_URL, json=payload)
+        if resp.status_code != 200:
+            raise HTTPException(status_code=500, detail=f"Erro ao criar issue via IA: {resp.text}")
 
-    return {"message": "Issue enviada ao GitLab", "gitlab_id": issue.gitlab_id}
+        db.delete(issue)
+        db.commit()
+
+        return {"message": "Issue enviada para GitLab via IA e removida do banco local", "gitlab_data": resp.json()}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao enviar issue: {str(e)}")
 
 @router.delete("/issues/local/{local_id}")
 def delete_local_issue(local_id: int, db: Session = Depends(get_db)):
@@ -128,7 +136,7 @@ def delete_local_issue(local_id: int, db: Session = Depends(get_db)):
 def favorite_issue(origin: str, project_id: int, gitlab_id: int, db: Session = Depends(get_db)):
     if origin == "local":
         issue = db.query(IssueLocal).filter(IssueLocal.id == gitlab_id).first()
-    else:  # "gitlab"
+    else:
         issue = db.query(IssueGitlab).filter(IssueGitlab.gitlab_id == gitlab_id,
                                             IssueGitlab.project_id == project_id).first()
     if not issue:

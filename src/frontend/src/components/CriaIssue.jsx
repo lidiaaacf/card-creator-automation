@@ -1,14 +1,27 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 
-export default function IssueFormModal({ isOpen, onClose, onSubmit }) {
+export default function IssueFormModal({ isOpen, onClose, onSubmit, issueToEdit }) {
   const [title, setTitle] = useState("");
   const [context, setContext] = useState("");
   const [client, setClient] = useState("");
   const [screen, setScreen] = useState("");
-  // const [screenshot, setScreenshot] = useState(null);
   const [weight, setWeight] = useState("1");
   const [type, setType] = useState("feature");
+  // const [screenshot, setScreenshot] = useState(null);
+
+  useEffect(() => {
+    if (issueToEdit) {
+      setTitle(issueToEdit.name || "");
+      setContext(issueToEdit.context || "");
+      setClient(issueToEdit.client || "");
+      setScreen(issueToEdit.screen || "");
+      setWeight(issueToEdit.weight?.toString() || "1");
+      setType(issueToEdit.issue_type || "feature");
+    }
+  }, [issueToEdit]);
+
+  if (!isOpen) return null;
 
   if (!isOpen) return null;
 
@@ -21,7 +34,8 @@ export default function IssueFormModal({ isOpen, onClose, onSubmit }) {
       client,
       screen,
       //screenshot,
-      sendToGitlab
+      sendToGitlab,
+      id: issueToEdit?.id,
     };
     onSubmit(newIssue);
     onClose();

@@ -121,36 +121,49 @@ export default function Inicio() {
   }
 
   const handleNewIssue = async (issueData) => {
-    try {
-      const payload = {
-        project: selectedProject.id.toString(), 
-        name: issueData.title, 
-        context: issueData.context,
-        weight: Number(issueData.weight), 
-        issue_type: issueData.type,
-        client: issueData.client,
-        screen: issueData.screen,
-        // screenshot_url: 
-      };
+  try {
+    const payload = {
+      project: selectedProject.id.toString(),
+      name: issueData.title,
+      context: issueData.context,
+      weight: Number(issueData.weight),
+      issue_type: issueData.type,
+      client: issueData.client,
+      screen: issueData.screen,
+    };
 
-      console.log("Payload enviado:", payload);
+    let url = "";
+    let body = JSON.stringify(payload);
 
-      const res = await fetch(URL_CRIA_ISSUE, {
-        method: "POST",
-        body: JSON.stringify(payload),
-        headers: { "Content-Type": "application/json" },
-      });
-
-      if (res.ok) {
-        addToast({ id: Date.now(), message: "Issue enviada para o Gitlab!" });
-      } else {
-        addToast({ id: Date.now(), message: "Erro ao enviar issue para Gitlab." });
-      }
-    } catch (err) {
-      addToast({ id: Date.now(), message: `Erro: ${err}` });
-      console.error(err);
+    if (issueData.sendToGitlab) {
+      url = URL_CRIA_ISSUE;
+    } else {
+      url = `${import.meta.env.VITE_API_URL}/issues/local`;
     }
-  };
+
+    console.log("Payload enviado:", payload, "URL:", url);
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+
+    if (!res.ok) throw new Error("Erro ao processar a issue");
+
+    const data = await res.json();
+
+    if (!issueData.sendToGitlab) {
+      addToast({ id: Date.now(), message: "Issue salva localmente!" });
+      setLocalIssues((prev) => [...prev, { ...payload, id: data.id }]);
+    } else {
+      addToast({ id: Date.now(), message: "Issue enviada para o GitLab!" });
+    }
+  } catch (err) {
+    addToast({ id: Date.now(), message: `Erro: ${err}` });
+    console.error(err);
+  }
+};
 
   if (loading) return <p className="text-white">Carregando...</p>;
 
@@ -235,53 +248,60 @@ export default function Inicio() {
             className="bg-black/40 rounded-xl overflow-hidden shadow-lg"
           >
             {issues.length === 0 ? (
-              <div className="p-6 text-center text-gray-400">
-                Nenhuma issue criada neste projeto ainda.
-              </div>
-            ) : (
-              <table className="w-full text-left">
-                <thead className="bg-black/60 text-orange-500 uppercase text-sm">
-                  <tr>
-                    {["ID", "Peso", "Tipo", "Tela", "Setor", "Issue Criada", "Status", "Ações"].map(
-                      (col) => (
-                        <th key={col} className="px-4 py-3">
-                          {col}
-                        </th>
-                      )
-                    )}
-                  </tr>
-                </thead>
-                  <tbody className="divide-y divide-gray-800">
-                    {(showFavorites ? issues.filter((issue) => issue.favorited) : issues)
-                      .filter(searchIssue)
-                      .map((issue, i) => {
-                        const { weight, type, status } = parseLabels(issue.labels || []);
-                        const screen = parseScreen(issue.description);
-                        return (
-                          <motion.tr
-                            key={issue.id || i}
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.4 + i * 0.05 }}
-                            className="hover:bg-white/5 transition"
-                          >
-                            <td className="px-4 py-3">{issue.iid}</td>
-                            <td className="px-4 py-3">{weight || "-"}</td>
-                            <td className="px-4 py-3">{type || "-"}</td>
-                            <td className="px-4 py-3">{screen || "-"}</td>
-                            <td className="px-4 py-3">{issue.author.username || "-"}</td>
-                            <td className="px-4 py-3">{created ? "Sim" : "Não"}</td>
-                            <td className="px-4 py-3">{status || "-"}</td>
-                            <td className="px-4 py-3">
-                              <Acoes issue={issue} onAction={(action, data) => console.log(action, data)} />
-                            </td>
-                          </motion.tr>
-                        );
-                      })}
-                  </tbody>
-              </table>
-            )}
-          </motion.div>
+            <div className="p-6 text-center text-gray-400">
+              Nenhuma issue criada neste projeto ainda.
+            </div>
+          ) : (
+            <table className="w-full text-left">
+            <thead className="bg-black/60 text-orange-500 uppercase text-sm">
+              <tr>
+                {["ID", "Peso", "Tipo", "Tela", "Setor", "Issue Criada", "Status", "Ações"].map(
+                  (col) => (
+                    <th key={col} className="px-4 py-3">
+                      {col}
+                    </th>
+                  )
+                )}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-800">
+              {issues
+              .filter(searchIssue)
+              .map((issue, i) => {
+                const { weight, type, status } = parseLabels(issue.labels || []);
+                const screen = parseScreen(issue.description);
+                const isSent = issue.sent === true;
+
+                return (
+                  <motion.tr
+                    key={issue.id || i}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.4 + i * 0.05 }}
+                    className={`hover:bg-white/5 transition ${
+                      isSent ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
+                  >
+                    <td className="px-4 py-3">{issue.iid}</td>
+                    <td className="px-4 py-3">{weight || "-"}</td>
+                    <td className="px-4 py-3">{type || "-"}</td>
+                    <td className="px-4 py-3">{screen || "-"}</td>
+                    <td className="px-4 py-3">{issue.author.username || "-"}</td>
+                    <td className="px-4 py-3">{created ? "Sim" : "Não"}</td>
+                    <td className="px-4 py-3">{status || "-"}</td>
+                    <td className="px-4 py-3">
+                  <Acoes
+                    issue={issue}
+                    onAction={(action, data) => console.log(action, data)}
+                  />
+                </td>
+                </motion.tr>
+              );
+            })}
+          </tbody>
+          </table>
+        )}
+        </motion.div>
         </div>
 
         <motion.div

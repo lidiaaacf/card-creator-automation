@@ -42,8 +42,6 @@ class IssueLocal(Base):
     context = Column(Text, nullable=True)
     weight = Column(Integer, nullable=True)
     issue_type = Column(String, nullable=True)
-    client = Column(String, nullable=True)
-    screen = Column(String, nullable=True)
     favorited = Column(Boolean, default=False)
     sent = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -56,8 +54,6 @@ class IssueLocalRequest(BaseModel):
     context: str
     weight: int
     issue_type: str
-    client: str
-    screen: str
 
 # ---------- ROTAS LOCAL ----------
 @router.post("/issues/local")
@@ -68,8 +64,6 @@ def save_local_issue(data: IssueLocalRequest, db: Session = Depends(get_db)):
         context=data.context,
         weight=data.weight,
         issue_type=data.issue_type,
-        client=data.client,
-        screen=data.screen,
         sent=False
     )
     db.add(issue)
@@ -87,8 +81,6 @@ def edit_local_issue(local_id: int, data: IssueLocalRequest, db: Session = Depen
     issue.context = data.context
     issue.weight = data.weight
     issue.issue_type = data.issue_type
-    issue.client = data.client
-    issue.screen = data.screen
 
     db.commit()
     db.refresh(issue)
@@ -106,8 +98,6 @@ def send_local_issue(issue_id: int, db: Session = Depends(get_db)):
         "context": issue.context,
         "weight": issue.weight,
         "issue_type": issue.issue_type,
-        "client": issue.client,
-        "screen": issue.screen,
     }
 
     try:

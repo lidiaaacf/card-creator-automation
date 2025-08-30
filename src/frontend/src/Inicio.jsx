@@ -82,31 +82,6 @@ export default function Inicio() {
     return { weight, type, status };
   }
 
-  function parseScreen(description) {
-    if (!description) return "Não aplicável";
-
-    const linkMatch = description.match(/Link:\s*(https?:\/\/[^\s]+)/);
-
-    if (!linkMatch) return "Não aplicável";
-
-    try {
-      const url = new URL(linkMatch[1]);
-      const parts = url.pathname.split("/").filter(Boolean);
-
-      if (parts.length > 0) {
-        const lastPart = decodeURIComponent(parts[parts.length - 1]);
-        if (lastPart.toLowerCase() === "não") {
-          return "Não aplicável";
-        }
-        return lastPart;
-      }
-
-      return "Não aplicável";
-    } catch (err) {
-      return "Não aplicável";
-    }
-  }
-
   function searchIssue(issue) {
     if (!searchTerm.trim()) return true;
     const term = searchTerm.toLowerCase();
@@ -128,8 +103,6 @@ export default function Inicio() {
       context: issueData.context,
       weight: Number(issueData.weight),
       issue_type: issueData.type,
-      client: issueData.client,
-      screen: issueData.screen,
     };
 
     let url = "";
@@ -255,7 +228,7 @@ export default function Inicio() {
             <table className="w-full text-left">
             <thead className="bg-black/60 text-orange-500 uppercase text-sm">
               <tr>
-                {["ID", "Peso", "Tipo", "Tela", "Setor", "Issue Criada", "Status", "Ações"].map(
+                {["ID", "Peso", "Tipo", "Usuário", "Issue Criada", "Status", "Ações"].map(
                   (col) => (
                     <th key={col} className="px-4 py-3">
                       {col}
@@ -269,7 +242,6 @@ export default function Inicio() {
               .filter(searchIssue)
               .map((issue, i) => {
                 const { weight, type, status } = parseLabels(issue.labels || []);
-                const screen = parseScreen(issue.description);
                 const isSent = issue.sent === true;
 
                 return (
@@ -285,7 +257,6 @@ export default function Inicio() {
                     <td className="px-4 py-3">{issue.iid}</td>
                     <td className="px-4 py-3">{weight || "-"}</td>
                     <td className="px-4 py-3">{type || "-"}</td>
-                    <td className="px-4 py-3">{screen || "-"}</td>
                     <td className="px-4 py-3">{issue.author.username || "-"}</td>
                     <td className="px-4 py-3">{created ? "Sim" : "Não"}</td>
                     <td className="px-4 py-3">{status || "-"}</td>

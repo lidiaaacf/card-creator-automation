@@ -41,8 +41,6 @@ class IssueRequest(BaseModel):
     context: str           # Contexto da inconformidade
     weight: int            # Peso (1, 2, 3, 5, 8, 13)
     issue_type: str        # Label principal (Bug levantado, New feature, Ajuste, )
-    client: str            # Nome do grupo/cliente 
-    screen: str            # Tela afetada
     # screenshot_url: str    # Screenshot mostrando a inconformidade
 
 @app.post("/create-issue/")
@@ -60,13 +58,6 @@ def create_issue(data: IssueRequest):
     
     ### CONTEXTO ###
     {data.context} (Aqui nessa sessão pode melhorar o detalhamento do contexto porém de forma breve)
-
-    ### TIPO DE ISSUE ###
-    ~{data.weight}  ~QA  ~{tipo_issue_md}
-
-    ### LOCAL ###
-    - Grupo: {data.client}  
-    - Link: https://dataself.com.br/{data.screen} 
 
     ### NÃO CONFORMIDADE ###
     Descreva detalhadamente a inconformidade, mantendo a formatação Markdown.   

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Calendar, User } from "lucide-react";
 import Select from "./components/Select";
-import Acoes from "./components/Acoes"
+import Acoes from "./components/Acoes";
 import IssueFormModal from "./components/CriaIssue";
 import { motion } from "framer-motion";
 import { useToast } from "./components/ui/use-toast";
@@ -14,15 +14,13 @@ export default function Inicio() {
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState([]);
-  const [created, setCreated] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
-  const [showFavorites, setShowFavorites] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
-  const [localIssues, setLocalIssues] = useState([]);
 
   const { addToast } = useToast();
 
+  // Carrega projetos
   useEffect(() => {
     (async () => {
       try {
@@ -34,20 +32,18 @@ export default function Inicio() {
       } catch (err) {
         console.error(err);
       } finally {
-        setCreated(true);
         setLoading(false);
       }
     })();
   }, []);
 
+  // Carrega issues do projeto selecionado
   useEffect(() => {
     if (!selectedProject?.id) return;
     setLoading(true);
     (async () => {
       try {
-        const resp = await fetch(
-          `${URL_ISSUES}/?project_id=${selectedProject.id}`
-        );
+        const resp = await fetch(`${URL_ISSUES}/?project_id=${selectedProject.id}`);
         if (!resp.ok) throw new Error("Erro ao buscar issues");
         const data = await resp.json();
         setIssues(Array.isArray(data) ? data : []);
@@ -55,7 +51,6 @@ export default function Inicio() {
         console.error("Erro:", err);
         setIssues([]);
       } finally {
-        setCreated(true);
         setLoading(false);
       }
     })();
@@ -65,18 +60,13 @@ export default function Inicio() {
     let weight = null;
     let type = null;
     let status = null;
-
     const tipos = ["bug levantado", "bug reportado", "new develop", "feature", "ajuste", "teste"];
     const statusList = ["ready", "to do", "doing", "review", "validation", "waiting prod", "done"];
 
     labels.forEach((label) => {
-      if (/^\d+$/.test(label)) {
-        weight = parseInt(label, 10);
-      } else if (tipos.includes(label.toLowerCase())) {
-        type = label;
-      } else if (statusList.includes(label.toLowerCase())) {
-        status = label;
-      }
+      if (/^\d+$/.test(label)) weight = parseInt(label, 10);
+      else if (tipos.includes(label.toLowerCase())) type = label;
+      else if (statusList.includes(label.toLowerCase())) status = label;
     });
 
     return { weight, type, status };
@@ -85,7 +75,6 @@ export default function Inicio() {
   function searchIssue(issue) {
     if (!searchTerm.trim()) return true;
     const term = searchTerm.toLowerCase();
-
     return (
       issue.iid?.toString().includes(term) ||
       issue.title?.toLowerCase().includes(term) ||
@@ -96,47 +85,32 @@ export default function Inicio() {
   }
 
   const handleNewIssue = async (issueData) => {
-  try {
-    const payload = {
-      project: selectedProject.id.toString(),
-      name: issueData.title,
-      context: issueData.context,
-      weight: Number(issueData.weight),
-      issue_type: issueData.type,
-    };
+    try {
+      const payload = {
+        project: selectedProject.id.toString(),
+        name: issueData.name,
+        context: issueData.context,
+        weight: issueData.weight.toString(),
+        issue_type: issueData.issue_type,
+      };
 
-    let url = "";
-    let body = JSON.stringify(payload);
+      const res = await fetch(`${URL_CRIA_ISSUE}/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-    if (issueData.sendToGitlab) {
-      url = URL_CRIA_ISSUE;
-    } else {
-      url = `${import.meta.env.VITE_API_URL}/issues/local`;
-    }
+      if (!res.ok) throw new Error("Erro ao criar issue no GitLab");
 
-    console.log("Payload enviado:", payload, "URL:", url);
-
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-    });
-
-    if (!res.ok) throw new Error("Erro ao processar a issue");
-
-    const data = await res.json();
-
-    if (!issueData.sendToGitlab) {
-      addToast({ id: Date.now(), message: "Issue salva localmente!" });
-      setLocalIssues((prev) => [...prev, { ...payload, id: data.id }]);
-    } else {
+      const data = await res.json();
       addToast({ id: Date.now(), message: "Issue enviada para o GitLab!" });
+      setIssues((prev) => [data, ...prev]);
+      setShowModal(false);
+    } catch (err) {
+      addToast({ id: Date.now(), message: `Erro: ${err.message}` });
+      console.error(err);
     }
-  } catch (err) {
-    addToast({ id: Date.now(), message: `Erro: ${err}` });
-    console.error(err);
-  }
-};
+  };
 
   if (loading) return <p className="text-white">Carregando...</p>;
 
@@ -148,35 +122,8 @@ export default function Inicio() {
         transition={{ duration: 0.5 }}
         className="flex items-center justify-between bg-black/40 rounded-2xl p-4 mb-6 shadow-lg"
       >
-        <Select
-          options={projects}
-          value={selectedProject}
-          onChange={setSelectedProject}
-        />
+        <Select options={projects} value={selectedProject} onChange={setSelectedProject} />
         <div className="flex items-center gap-3">
-          {["Favoritas", "Minhas Issues", "Templates"].map((item) => {
-            const isFavorites = item === "Favoritas";
-            const isActive = isFavorites && showFavorites;
-
-            return (
-              <motion.button
-                key={item}
-                whileHover={{ scale: 1.05 }}
-                className={`px-4 py-1 rounded-full border text-sm transition 
-        ${isActive
-                    ? "bg-orange-600 text-white border-orange-600"
-                    : "border-orange-500 text-orange-500 hover:bg-orange-500/10"
-                  }`}
-                onClick={() => {
-                  if (isFavorites) {
-                    setShowFavorites((prev) => !prev);
-                  }
-                }}
-              >
-                {isFavorites ? (showFavorites ? "Todas" : "Favoritas") : item}
-              </motion.button>
-            );
-          })}
           <div className="p-2 rounded-full bg-orange-600 hover:bg-orange-500 cursor-pointer">
             <User size={20} />
           </div>
@@ -191,17 +138,19 @@ export default function Inicio() {
             transition={{ delay: 0.2 }}
             className="flex gap-3 mb-6"
           >
-            <button 
+            <button
               className="bg-orange-600 hover:bg-orange-500 px-5 py-2 rounded-lg font-semibold shadow-md"
               onClick={() => setShowModal(true)}
             >
               Cadastrar nova issue
             </button>
+
             <IssueFormModal
               isOpen={showModal}
               onClose={() => setShowModal(false)}
               onSubmit={handleNewIssue}
             />
+
             <input
               type="text"
               placeholder="Pesquisar issue"
@@ -209,9 +158,6 @@ export default function Inicio() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="bg-gray-800 text-white px-4 py-2 rounded-lg w-64 outline-none focus:ring focus:ring-orange-500/50"
             />
-            <button className="bg-orange-600 hover:bg-orange-500 px-5 py-2 rounded-lg font-semibold shadow-md">
-              Enviar issues
-            </button>
           </motion.div>
 
           <motion.div
@@ -221,60 +167,48 @@ export default function Inicio() {
             className="bg-black/40 rounded-xl overflow-hidden shadow-lg"
           >
             {issues.length === 0 ? (
-            <div className="p-6 text-center text-gray-400">
-              Nenhuma issue criada neste projeto ainda.
-            </div>
-          ) : (
-            <table className="w-full text-left">
-            <thead className="bg-black/60 text-orange-500 uppercase text-sm">
-              <tr>
-                {["ID", "Peso", "Tipo", "Usuário", "Issue Criada", "Status", "Ações"].map(
-                  (col) => (
-                    <th key={col} className="px-4 py-3">
-                      {col}
-                    </th>
-                  )
-                )}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-800">
-              {issues
-              .filter(searchIssue)
-              .map((issue, i) => {
-                const { weight, type, status } = parseLabels(issue.labels || []);
-                const isSent = issue.sent === true;
-
-                return (
-                  <motion.tr
-                    key={issue.id || i}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.4 + i * 0.05 }}
-                    className={`hover:bg-white/5 transition ${
-                      isSent ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
-                  >
-                    <td className="px-4 py-3">{issue.iid}</td>
-                    <td className="px-4 py-3">{weight || "-"}</td>
-                    <td className="px-4 py-3">{type || "-"}</td>
-                    <td className="px-4 py-3">{issue.author.username || "-"}</td>
-                    <td className="px-4 py-3">{created ? "Sim" : "Não"}</td>
-                    <td className="px-4 py-3">{status || "-"}</td>
-                    <td className="px-4 py-3">
-                  <Acoes
-                    issue={issue}
-                    onAction={(action, data) => console.log(action, data)}
-                  />
-                </td>
-                </motion.tr>
-              );
-            })}
-          </tbody>
-          </table>
-        )}
-        </motion.div>
+              <div className="p-6 text-center text-gray-400">
+                Nenhuma issue criada neste projeto ainda.
+              </div>
+            ) : (
+              <table className="w-full text-left">
+                <thead className="bg-black/60 text-orange-500 uppercase text-sm">
+                  <tr>
+                    {["ID", "Peso", "Tipo", "Usuário", "Status", "Ações"].map((col) => (
+                      <th key={col} className="px-4 py-3">{col}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800">
+                  {issues.filter(searchIssue).map((issue, i) => {
+                    const { weight, type, status } = parseLabels(issue.labels || []);
+                    return (
+                      <motion.tr
+                        key={issue.id || i}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.4 + i * 0.05 }}
+                        className="hover:bg-white/5 transition"
+                      >
+                        <td className="px-4 py-3">{issue.iid}</td>
+                        <td className="px-4 py-3">{weight || "-"}</td>
+                        <td className="px-4 py-3">{type || "-"}</td>
+                        <td className="px-4 py-3">{issue.author.username || "-"}</td>
+                        <td className="px-4 py-3">{status || "-"}</td>
+                        <td className="px-4 py-3">
+                          <Acoes
+                            issue={issue}
+                            onAction={(action, data) => console.log(action, data)}
+                          />
+                        </td>
+                      </motion.tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </motion.div>
         </div>
-
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -322,3 +256,6 @@ export default function Inicio() {
     </div>
   );
 }
+
+
+

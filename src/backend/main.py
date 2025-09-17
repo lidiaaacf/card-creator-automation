@@ -1,109 +1,162 @@
 import os
-import gitlab
+from datetime import datetime
 import cohere
-from fastapi import Query
-from fastapi import FastAPI
-from pydantic import BaseModel
+import gitlab
 from dotenv import load_dotenv
-from database import router as database_router
+from fastapi import Depends, FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from database import Session, get_db, IssueGitlab, Depends
+from pydantic import BaseModel
+from openai import OpenAI
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Integer,
+    String,
+    Text,
+    create_engine,
+)
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import Session, sessionmaker
 
 load_dotenv()
 
 GITLAB_URL = os.getenv("GITLAB_URL")
 PRIVATE_TOKEN = os.getenv("GITLAB_TOKEN")
-PROJECT_ID = int(os.getenv("GITLAB_PROJECT_ID"))
 COHERE_API_KEY = os.getenv("COHERE_API_KEY")
 LOCAL_FRONT = os.getenv("LOCAL_FRONT")
 IP_FRONT = os.getenv("IP_FRONT")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./issues.db")
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False}
+    if DATABASE_URL.startswith("sqlite")
+    else {},
+)
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+Base = declarative_base()
 
-app = FastAPI() 
 
-co = cohere.ClientV2(COHERE_API_KEY)
-gl = gitlab.Gitlab(GITLAB_URL, private_token=PRIVATE_TOKEN)
-app.include_router(database_router, prefix="/db")
+def get_db():
+    """Dependência para obter a sessão do banco."""
+    with SessionLocal() as db:
+        yield db
+
+
+class IssueFavorite(Base):
+    __tablename__ = "issues_favorite"
+
+    id = Column(Integer, primary_key=True, index=True)
+    gitlab_id = Column(Integer, unique=True, nullable=False)
+    project_id = Column(String, nullable=False)
+    name = Column(String, nullable=False)
+    context = Column(Text, nullable=True)
+    weight = Column(String, nullable=True)
+    favorited = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        LOCAL_FRONT,
-        IP_FRONT
-    ],
+    allow_origins=[LOCAL_FRONT, IP_FRONT],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+co = cohere.Client(COHERE_API_KEY)
+gl = gitlab.Gitlab(GITLAB_URL, private_token=PRIVATE_TOKEN)
 class IssueRequest(BaseModel):
-    project: str           # Projeto onde a issue será criada
-    name: str              # Título da issue
-    context: str           # Contexto da inconformidade
-    weight: int            # Peso (1, 2, 3, 5, 8, 13)
-    issue_type: str        # Label principal (Bug levantado, New feature, Ajuste, )
-    # screenshot_url: str    # Screenshot mostrando a inconformidade
+    project: str     # ID ou path do projeto no GitLab
+    name: str        # Título da issue
+    context: str     # Contexto do problema
+    weight: str      # Peso/estimativa (1,2,3,5,8,13)
+    issue_type: str  # Ex: Bug levantado, New feature, Ajuste
 
 @app.post("/create-issue/")
-def create_issue(data: IssueRequest):
+async def create_issue(issue: IssueRequest):
     """
-    Cria issues de acordo com o template padrão e via parâmetros passados.
+    Cria issues de acordo com o template padrão, usando Cohere para gerar a descrição
+    e GitLab para criar a issue de fato.
     """
-    if " " in data.issue_type:
-        tipo_issue_md = f"{data.issue_type}"
-    else:
-       tipo_issue_md = data.issue_type
-        
     prompt = f"""
-    Gere uma issue seguindo o seguinte template, completando somente as partes indicadas sem excessão
-    
-    ### CONTEXTO ###
-    {data.context} (Aqui nessa sessão pode melhorar o detalhamento do contexto porém de forma breve)
+        Gere uma issue seguindo o seguinte template, completando somente as partes indicadas sem excessão
 
-    ### NÃO CONFORMIDADE ###
-    Descreva detalhadamente a inconformidade, mantendo a formatação Markdown.   
+        ### CONTEXTO ###
+        {issue.context} (Aqui nessa sessão pode melhorar o detalhamento do contexto porém de forma breve)
 
-    ### AÇÕES ESPERADAS ###
-    Liste os passos esperados para resolver a inconformidade em formato de checkbox
-    
+        ### NÃO CONFORMIDADE ###
+        Descreva detalhadamente a inconformidade, mantendo a formatação Markdown.
+
+        ### AÇÕES ESPERADAS ###
+        Liste os passos esperados para resolver a inconformidade em formato de checkbox
     - [ ] Cada tópico deve ser listado assim
     """
 
-    response = co.chat( 
-        model="command-a-03-2025", 
-        messages=[{"role": "user", "content": prompt}] 
-    ) 
-    
-    description = ""
-    
-    if hasattr(response.message, "content") and isinstance(response.message.content, list):
-        for item in response.message.content:
-            if getattr(item, "type", None) == "text":
-                description += item.text + "\n"
-    else:
-        raise ValueError(f"Unexpected Cohere response format: {response}")
+    try:
+        client = OpenAI(
+            base_url="https://api.cohere.ai/compatibility/v1",
+            api_key=COHERE_API_KEY,
+        )
+        
+        completion = client.chat.completions.create(
+            model="command-a-03-2025",
+            messages=[{"role": "user", "content": prompt}],
+        )
 
-    project = gl.projects.get(data.project)
+        description = completion.choices[0].message.content
+        project = gl.projects.get(issue.project)
+        labels_list = [issue.weight, "QA", issue.issue_type, "Ready"]
+
+        issue = project.issues.create({
+            "title": f"{issue.name}",
+            "description": description,
+            "labels": labels_list
+        })
+        
+        return {
+            "gitlab_id": issue.iid,
+            "name": issue.name,
+            "description": description,
+            "weight": issue.weight,
+            "type": issue.issue_type,
+            "project": issue.project
+        }
+        
+    except Exception as e:
+        print("ERRO NA API COHERE OU GITLAB:", str(e))
+        raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
     
-    labels_list = [data.weight, "QA", data.issue_type, "Ready"]
+@app.get("/get-projects/")
+def get_projects():
+    """
+    Lista os projetos do GitLab nos quais o token possui acesso.
+    """
+    projects = gl.projects.list(owned=True, membership=True, all=True)
+    return [{"id": p.id, "name": p.name, "web_url": p.web_url} for p in projects]
 
-    issue = project.issues.create({
-        "title": f"{data.name}",
-        "description": description,
-        "labels": labels_list
-    })
-
-    return {"message": "Issue criada com sucesso", "url": issue.web_url}   
 
 @app.get("/get-automation-issues/")
-def get_automation_issues(project_id: int = Query(..., description="ID do projeto"), db: Session = Depends(get_db)):
+def get_automation_issues(
+    project_id: int = Query(..., description="ID do projeto"),
+    db: Session = Depends(get_db),
+):
+    """
+    Retorna issues criadas pelo usuário atual no GitLab,
+    indicando quais estão favoritadas localmente.
+    """
     project = gl.projects.get(project_id)
     issues = project.issues.list(scope="created_by_me", all=True)
 
     favorites = {
-        issue.gitlab_id for issue in db.query(IssueGitlab).filter(
-            IssueGitlab.project_id == project_id,
-            IssueGitlab.favorited == True
-        ).all()
+        fav.gitlab_id
+        for fav in db.query(IssueFavorite)
+        .filter(IssueFavorite.project_id == project_id, IssueFavorite.favorited == True)
+        .all()
     }
 
     response = []
@@ -115,14 +168,70 @@ def get_automation_issues(project_id: int = Query(..., description="ID do projet
     return response
 
 
-@app.get("/get-projects/")
-def get_projects():
-    try:
-        projects = gl.projects.list(owned=True, membership=True, all=True)
-        project_list = [
-            {"id": p.id, "name": p.name, "web_url": p.web_url}
-            for p in projects
-        ]
-        return project_list
-    except Exception as e:
-        return {"error": str(e)} 
+@app.post("/issues/{project_id}/{gitlab_id}/favorite")
+def toggle_favorite(
+    project_id: int,
+    gitlab_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Marca ou desmarca uma issue como favorita localmente.
+    """
+    fav = (
+        db.query(IssueFavorite)
+        .filter(
+            IssueFavorite.gitlab_id == gitlab_id,
+            IssueFavorite.project_id == project_id,
+        )
+        .first()
+    )
+
+    if not fav:
+        git_issue = gl.projects.get(project_id).issues.get(gitlab_id)
+        fav = IssueFavorite(
+            gitlab_id=gitlab_id,
+            project_id=project_id,
+            name=git_issue.title,
+            context=git_issue.description,
+            weight=str(git_issue.weight) if git_issue.weight else None,
+            favorited=True,
+        )
+        db.add(fav)
+    else:
+        fav.favorited = not fav.favorited
+
+    db.commit()
+    db.refresh(fav)
+    return {"gitlab_id": gitlab_id, "project_id": project_id, "favorited": fav.favorited}
+
+
+@app.get("/issues/{project_id}/{gitlab_id}")
+def get_issue_details(
+    project_id: int,
+    gitlab_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Retorna detalhes armazenados localmente de uma issue favoritada.
+    """
+    fav = (
+        db.query(IssueFavorite)
+        .filter(
+            IssueFavorite.gitlab_id == gitlab_id,
+            IssueFavorite.project_id == project_id,
+        )
+        .first()
+    )
+
+    if not fav:
+        return {"error": "Issue não encontrada no banco local"}
+
+    return {
+        "gitlab_id": fav.gitlab_id,
+        "project_id": fav.project_id,
+        "name": fav.name,
+        "context": fav.context,
+        "weight": fav.weight,
+        "favorited": fav.favorited,
+        "created_at": fav.created_at,
+    }

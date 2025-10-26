@@ -20,7 +20,6 @@ export default function Inicio() {
 
   const { addToast } = useToast();
 
-  // Carrega projetos
   useEffect(() => {
     (async () => {
       try {
@@ -37,7 +36,6 @@ export default function Inicio() {
     })();
   }, []);
 
-  // Carrega issues do projeto selecionado
   useEffect(() => {
     if (!selectedProject?.id) return;
     setLoading(true);
@@ -87,10 +85,10 @@ export default function Inicio() {
   const handleNewIssue = async (issueData) => {
     try {
       const payload = {
-        project: selectedProject.id.toString(),
-        name: issueData.name,
+        project: selectedProject?.id?.toString() || "",
+        title: issueData.title,
         context: issueData.context,
-        weight: issueData.weight.toString(),
+        weight: issueData.weight,
         issue_type: issueData.issue_type,
       };
 

@@ -4,8 +4,8 @@ import { motion } from "framer-motion";
 export default function IssueFormModal({ isOpen, onClose, onSubmit, issueToEdit }) {
   const [title, setTitle] = useState("");
   const [context, setContext] = useState("");
-  const [weight, setWeight] = useState("1");
-  const [type, setType] = useState("feature");
+  const [weight, setWeight] = useState({ value: "1", label: "1" });
+  const [type, setType] = useState({ value: "feature", label: "Feature" });
 
   useEffect(() => {
     if (issueToEdit) {
@@ -20,10 +20,10 @@ export default function IssueFormModal({ isOpen, onClose, onSubmit, issueToEdit 
 
   const handleSubmit = () => {
     const newIssue = {
-      title: title,
-      context,
-      weight,
-      issue_type: type,
+      title: title || "",
+      context: context || "",
+      weight: weight.value,
+      issue_type: type.label,
     };
     onSubmit(newIssue);
     onClose();
@@ -74,8 +74,11 @@ export default function IssueFormModal({ isOpen, onClose, onSubmit, issueToEdit 
 
           <select
             className="bg-gray-800 px-3 py-2 rounded-lg"
-            value={weight}
-            onChange={(e) => setWeight(e.target.value)}
+            value={weight.value}
+            onChange={(e) => {
+              const selected = issueWeights.find(opt => opt.value === e.target.value);
+              setWeight(selected);
+            }}
           >
             {issueWeights.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -86,8 +89,11 @@ export default function IssueFormModal({ isOpen, onClose, onSubmit, issueToEdit 
 
           <select
             className="bg-gray-800 px-3 py-2 rounded-lg"
-            value={type}
-            onChange={(e) => setType(e.target.value)}
+            value={type.value}
+            onChange={(e) => {
+              const selected = issueTypes.find(opt => opt.value === e.target.value);
+              setType(selected);
+            }}
           >
             {issueTypes.map((opt) => (
               <option key={opt.value} value={opt.value}>

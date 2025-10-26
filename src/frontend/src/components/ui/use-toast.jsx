@@ -5,11 +5,10 @@ const ToastContext = React.createContext(null)
 
 export function ToastProvider({ children }) {
     const [toasts, setToasts] = React.useState([])
-
-    const addToast = (toast) => {
-        setToasts((prev) => [...prev, toast])
+    const addToast = ({ id, message, type = "success" }) => {
+        setToasts((prev) => [...prev, { id, message, type }])
         setTimeout(() => {
-            setToasts((prev) => prev.filter((t) => t.id !== toast.id))
+            setToasts((prev) => prev.filter((t) => t.id !== id))
         }, 3000)
     }
 
@@ -20,7 +19,10 @@ export function ToastProvider({ children }) {
                 {toasts.map((toast) => (
                     <div
                         key={toast.id}
-                        className="bg-gray-900 text-white px-4 py-2 rounded-lg shadow-md"
+                        className={`px-4 py-2 rounded-lg shadow-md border-l-4 ${toast.type === "success"
+                                ? "bg-green-600 text-white border-green-400"
+                                : "bg-red-600 text-white border-red-400"
+                            }`}
                     >
                         {toast.message}
                     </div>

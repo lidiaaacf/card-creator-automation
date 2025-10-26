@@ -91,7 +91,6 @@ export default function Inicio() {
         weight: issueData.weight,
         issue_type: issueData.issue_type,
       };
-
       const res = await fetch(`${URL_CRIA_ISSUE}/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -100,12 +99,14 @@ export default function Inicio() {
 
       if (!res.ok) throw new Error("Erro ao criar issue no GitLab");
 
-      const data = await res.json();
-      addToast({ id: Date.now(), message: "Issue enviada para o GitLab!" });
-      setIssues((prev) => [data, ...prev]);
+      addToast({ id: Date.now(), message: "Issue enviada para o GitLab!", type: "success" });
+
+      const issuesResp = await fetch(`${URL_ISSUES}/?project_id=${selectedProject.id}`);
+      const issuesData = await issuesResp.json();
+      setIssues(Array.isArray(issuesData) ? issuesData : []);
       setShowModal(false);
     } catch (err) {
-      addToast({ id: Date.now(), message: `Erro: ${err.message}` });
+      addToast({ id: Date.now(), message: `Erro: ${err.message}`, type: "error" });
       console.error(err);
     }
   };

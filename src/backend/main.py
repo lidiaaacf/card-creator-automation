@@ -49,7 +49,7 @@ class IssueFavorite(Base):
     id = Column(Integer, primary_key=True, index=True)
     gitlab_id = Column(Integer, unique=True, nullable=False)
     project_id = Column(String, nullable=False)
-    name = Column(String, nullable=False)
+    title = Column(String, nullable=False)
     context = Column(Text, nullable=True)
     weight = Column(String, nullable=True)
     favorited = Column(Boolean, default=False)
@@ -72,7 +72,7 @@ co = cohere.Client(COHERE_API_KEY)
 gl = gitlab.Gitlab(GITLAB_URL, private_token=PRIVATE_TOKEN)
 class IssueRequest(BaseModel):
     project: str     # ID ou path do projeto no GitLab
-    name: str        # Título da issue
+    title: str       # Título da issue
     context: str     # Contexto do problema
     weight: str      # Peso/estimativa (1,2,3,5,8,13)
     issue_type: str  # Ex: Bug levantado, New feature, Ajuste
@@ -84,7 +84,7 @@ async def create_issue(issue: IssueRequest):
     e GitLab para criar a issue de fato.
     """
     prompt = f"""
-        Gere uma issue seguindo o seguinte template, completando somente as partes indicadas sem excessão
+        Gere uma issue seguindo o seguinte template, completando somente as partes indicadas sem exceção.
 
         ### CONTEXTO ###
         {issue.context} (Aqui nessa sessão pode melhorar o detalhamento do contexto porém de forma breve)
@@ -94,7 +94,7 @@ async def create_issue(issue: IssueRequest):
 
         ### AÇÕES ESPERADAS ###
         Liste os passos esperados para resolver a inconformidade em formato de checkbox
-    - [ ] Cada tópico deve ser listado assim
+        - [ ] Cada tópico deve ser listado assim
     """
 
     try:
@@ -102,7 +102,7 @@ async def create_issue(issue: IssueRequest):
             base_url="https://api.cohere.ai/compatibility/v1",
             api_key=COHERE_API_KEY,
         )
-        
+
         completion = client.chat.completions.create(
             model="command-a-03-2025",
             messages=[{"role": "user", "content": prompt}],
@@ -111,22 +111,21 @@ async def create_issue(issue: IssueRequest):
         description = completion.choices[0].message.content
         project = gl.projects.get(issue.project)
         labels_list = [issue.weight, "QA", issue.issue_type, "Ready"]
-
-        issue = project.issues.create({
-            "title": f"{issue.name}",
+        created_issue = project.issues.create({
+            "title": issue.title,
             "description": description,
             "labels": labels_list
         })
-        
+
         return {
-            "gitlab_id": issue.iid,
-            "name": issue.name,
+            "gitlab_id": created_issue.iid,
+            "title": issue.title,
             "description": description,
             "weight": issue.weight,
             "type": issue.issue_type,
             "project": issue.project
         }
-        
+
     except Exception as e:
         print("ERRO NA API COHERE OU GITLAB:", str(e))
         raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
@@ -137,8 +136,8 @@ def get_projects():
     Lista os projetos do GitLab nos quais o token possui acesso.
     """
     projects = gl.projects.list(owned=True, membership=True, all=True)
-    return [{"id": p.id, "name": p.name, "web_url": p.web_url} for p in projects]
-
+    full_projects = [gl.projects.get(p.id) for p in projects]
+    return [{"id": p.id, "title": p.name, "web_url": p.web_url} for p in full_projects]
 
 @app.get("/get-automation-issues/")
 def get_automation_issues(
@@ -192,7 +191,7 @@ def toggle_favorite(
         fav = IssueFavorite(
             gitlab_id=gitlab_id,
             project_id=project_id,
-            name=git_issue.title,
+            title= git_issue.title,
             context=git_issue.description,
             weight=str(weight_value) if weight_value else None,
             favorited=True,
@@ -231,7 +230,7 @@ def get_issue_details(
     return {
         "gitlab_id": fav.gitlab_id,
         "project_id": fav.project_id,
-        "name": fav.name,
+        "title": fav.title,
         "context": fav.context,
         "weight": fav.weight,
         "favorited": fav.favorited,

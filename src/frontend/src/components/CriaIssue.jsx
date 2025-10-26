@@ -9,7 +9,7 @@ export default function IssueFormModal({ isOpen, onClose, onSubmit, issueToEdit 
 
   useEffect(() => {
     if (issueToEdit) {
-      setTitle(issueToEdit.name || "");
+      setTitle(issueToEdit.title || "");
       setContext(issueToEdit.context || "");
       setWeight(issueToEdit.weight?.toString() || "1");
       setType(issueToEdit.issue_type || "feature");
@@ -20,7 +20,7 @@ export default function IssueFormModal({ isOpen, onClose, onSubmit, issueToEdit 
 
   const handleSubmit = () => {
     const newIssue = {
-      name: title,
+      title: title,
       context,
       weight,
       issue_type: type,

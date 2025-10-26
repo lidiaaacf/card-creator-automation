@@ -10,8 +10,8 @@ import DateRangePicker from "./components/Datepicker";
 
 export default function Inicio() {
   const URL_ISSUES = import.meta.env.VITE_ISSUES_GITLAB;
-  const URL_PROJETOS = import.meta.env.VITE_PROJETOS_GITLAB;
-  const URL_CRIA_ISSUE = import.meta.env.VITE_CRIA_ISSUE;
+  const URL_PROJETOS = import.meta.env.VITE_PROJECTS_GITLAB;
+  const URL_CRIA_ISSUE = import.meta.env.VITE_CREATE_ISSUE;
 
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);

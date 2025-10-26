@@ -8,12 +8,9 @@ The dashboard functionality provides a clear overview of project issues, helping
 ## Requirements
 - Node.js >= 18
 - React 18
-- Tailwind CSS
-- Project dependencies (`npm install` or `yarn`)
-- Environment variables:
-  - `VITE_ISSUES_GITLAB` → API URL for issues
-  - `VITE_PROJETOS_GITLAB` → API URL for projects
-  - `VITE_CRIA_ISSUE` → API URL to create new issues
+- Python ≥ 3.10
+- Project dependencies (see docs)
+- Environment variables (see docs)
 
 ## Main Features
 - Select a project and view its issues

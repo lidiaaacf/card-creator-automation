@@ -15,20 +15,6 @@ https://docs.gitlab.com/user/profile/personal_access_tokens
 ![alt text](images/image-10.png)  
 ![alt text](images/image-12.png)  
 ![alt text](images/image-13.png)  
-
-#### Gitlab Project ID  
-
-##### First project
-![alt text](images/image.png)  
-![alt text](images/image-1.png)   
-![alt text](images/image-2.png)  
-![alt text](images/image-4.png)  
-![alt text](images/image-3.png)  
-![alt text](images/image-5.png)  
-![alt text](images/image-6.png)  
-
-##### Project already created   
-![alt text](images/image-7.png)  
  
 #### Cohere API 
 
@@ -68,7 +54,6 @@ Create a `.env` file inside the `src/backend` folder with the following variable
 ```
 GITLAB_URL=https://gitlab.com
 GITLAB_TOKEN=<your_gitlab_access_token>
-GITLAB_PROJECT_ID=<your_gitlab_project_id>
 COHERE_API_KEY=<your_cohere_trial_key>
 LOCAL_FRONT='http://localhost:5173'
 LOCAL_BACK='http://localhost:8080'

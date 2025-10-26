@@ -59,8 +59,8 @@ Create a `.env` file inside the `src/frontend` folder with the following variabl
 ```
 VITE_ISSUES_DB='http://localhost:8080'
 VITE_ISSUES_GITLAB='http://localhost:8080/get-automation-issues'
-VITE_PROJETOS_GITLAB='http://localhost:8080/get-projects/'
-VITE_CRIA_ISSUE='http://localhost:8080/create-issue'
+VITE_PROJECTS_GITLAB='http://localhost:8080/get-projects/'
+VITE_CREATE_ISSUE='http://localhost:8080/create-issue'
 ```
 
 Create a `.env` file inside the `src/backend` folder with the following variables:

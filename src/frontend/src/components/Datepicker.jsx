@@ -36,14 +36,20 @@ export default function DateRangePicker({ startDate, endDate, onChangeStart, onC
                 dateFormat="dd/MM/yyyy"
                 placeholderText="Data inicial"
                 customInput={<CustomInput placeholder="Data inicial" />}
+                withPortal
+                portalId="datepicker-portal"
+                popperClassName="!bg-transparent"
             />
-            <span className="text-white font-bold">a</span>
+            <span className="text-white font-bold">_</span>
             <DatePicker
                 selected={endDate}
                 onChange={onChangeEnd}
                 dateFormat="dd/MM/yyyy"
                 placeholderText="Data final"
                 customInput={<CustomInput placeholder="Data final" />}
+                withPortal
+                portalId="datepicker-portal"
+                popperClassName="!bg-transparent"
             />
         </div>
     );

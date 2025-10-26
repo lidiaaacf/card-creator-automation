@@ -7,7 +7,7 @@ export default function Select({ options = [], value = null, onChange }) {
     return (
         <div className="relative inline-block w-60">
             <Listbox value={value} onChange={onChange}>
-                <Listbox.Button className="w-full text-left text-2xl font-bold text-orange-500 px-4 py-2 bg-gray-800 rounded-lg">
+                <Listbox.Button className="w-full text-left text-2xl font-bold text-orange-500 px-4 py-2 rounded-lg">
                     {label}
                 </Listbox.Button>
 

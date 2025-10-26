@@ -169,7 +169,7 @@ export default function Inicio() {
   if (loading) return <p className="text-white">Carregando...</p>;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white p-4">
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white p-2">
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -183,8 +183,7 @@ export default function Inicio() {
           </div>
         </div>
       </motion.div>
-
-      <div className="flex gap-6">
+      <div className="flex gap-6 pr-16 pl-10">
         <div className="flex-1">
           <motion.div
             initial={{ opacity: 0, y: -10 }}
@@ -198,13 +197,11 @@ export default function Inicio() {
             >
               Cadastrar nova issue
             </button>
-
             <IssueFormModal
               isOpen={showModal}
               onClose={() => setShowModal(false)}
               onSubmit={handleNewIssue}
             />
-
             <input
               type="text"
               placeholder="Pesquisar issue"
@@ -212,6 +209,17 @@ export default function Inicio() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="bg-gray-800 text-white px-4 py-2 rounded-lg w-64 outline-none focus:ring focus:ring-orange-500/50"
             />
+            <button
+              className="bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded-lg text-white font-semibold"
+              onClick={() => {
+                setSearchTerm("");
+                setStartDate("");
+                setEndDate("");
+              }}
+            >
+              Limpar
+            </button>
+
           </motion.div>
           <motion.div
             initial={{ opacity: 0 }}

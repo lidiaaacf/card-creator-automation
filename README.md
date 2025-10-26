@@ -1,5 +1,3 @@
-# GitLab Issues Automated Tracker
-
 ## Objective
 This project provides an interface to view, create, and track GitLab project issues, with date range filtering and summary statistics. It integrates with the GitLab API to create issues remotely and fetch data for tracking purposes. Additionally, it uses the Cohere AI API to enhance issue specifications following a standardized template.
 

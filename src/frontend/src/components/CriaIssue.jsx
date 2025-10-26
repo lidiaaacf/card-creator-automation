@@ -16,6 +16,15 @@ export default function IssueFormModal({ isOpen, onClose, onSubmit, issueToEdit 
     }
   }, [issueToEdit]);
 
+  useEffect(() => {
+    if (!isOpen) {
+      setTitle("");
+      setContext("");
+      setWeight("");
+      setType("");
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleSubmit = () => {

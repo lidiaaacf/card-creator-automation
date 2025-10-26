@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from "react";
-import { Calendar, User } from "lucide-react";
-import Select from "./components/Select";
-import Acoes from "./components/Acoes";
-import IssueFormModal from "./components/CriaIssue";
 import { motion } from "framer-motion";
+import Acoes from "./components/Acoes";
+import Select from "./components/Select";
+import { Calendar, User } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import IssueFormModal from "./components/CriaIssue";
+import DashboardStats from "./components/Dashboard";
 import { useToast } from "./components/ui/use-toast";
+import DateRangePicker from "./components/Datepicker";
 
 export default function Inicio() {
   const URL_ISSUES = import.meta.env.VITE_ISSUES_GITLAB;
@@ -17,8 +19,54 @@ export default function Inicio() {
   const [selectedProject, setSelectedProject] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
+  const [startDate, setStartDate] = React.useState(null);
+  const [endDate, setEndDate] = React.useState(null); 
+  const { addToast } = useToast(); 
 
-  const { addToast } = useToast();
+  function filterByDate(issue) {
+    if (!startDate && !endDate) return true;
+
+    const created = new Date(issue.created_at);
+
+    if (startDate && endDate) {
+      const endOfDay = new Date(endDate);
+      endOfDay.setHours(23, 59, 59, 999);
+      return created >= startDate && created <= endOfDay;
+    }
+
+    if (startDate) return created >= startDate;
+    if (endDate) {
+      const endOfDay = new Date(endDate);
+      endOfDay.setHours(23, 59, 59, 999);
+      return created <= endOfDay;
+    }
+    return true;
+  }
+
+  const filteredIssues = issues
+    .filter(searchIssue)
+    .filter(filterByDate);
+
+  useEffect(() => {
+    if (!selectedProject?.id) return;
+    setStartDate(null);
+    setEndDate(null);
+    setLoading(true);
+
+    (async () => {
+      try {
+        const resp = await fetch(`${URL_ISSUES}/?project_id=${selectedProject.id}`);
+        if (!resp.ok) throw new Error("Erro ao buscar issues");
+        const data = await resp.json();
+        setIssues(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Erro:", err);
+        setIssues([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [selectedProject?.id]);
 
   useEffect(() => {
     (async () => {
@@ -58,13 +106,20 @@ export default function Inicio() {
     let weight = null;
     let type = null;
     let status = null;
+
     const tipos = ["bug levantado", "bug reportado", "new develop", "feature", "ajuste", "teste"];
     const statusList = ["ready", "to do", "doing", "review", "validation", "waiting prod", "done"];
 
     labels.forEach((label) => {
-      if (/^\d+$/.test(label)) weight = parseInt(label, 10);
-      else if (tipos.includes(label.toLowerCase())) type = label;
-      else if (statusList.includes(label.toLowerCase())) status = label;
+      const l = label.toLowerCase().trim();
+
+      if (/^\d+$/.test(l)) {
+        weight = parseInt(l, 10);
+      } else if (tipos.includes(l)) {
+        type = l;
+      } else if (statusList.includes(l)) {
+        status = l;
+      }
     });
 
     return { weight, type, status };
@@ -158,7 +213,6 @@ export default function Inicio() {
               className="bg-gray-800 text-white px-4 py-2 rounded-lg w-64 outline-none focus:ring focus:ring-orange-500/50"
             />
           </motion.div>
-
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -173,37 +227,37 @@ export default function Inicio() {
               <table className="w-full text-left">
                 <thead className="bg-black/60 text-orange-500 uppercase text-sm">
                   <tr>
-                    {["ID", "Peso", "Tipo", "Usuário", "Status", "Ações"].map((col) => (
+                    {["ID", "Peso", "Tipo", "Usuário", "Fase", "Ações"].map((col) => (
                       <th key={col} className="px-4 py-3">{col}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-800">
-                  {issues.filter(searchIssue).map((issue, i) => {
-                    const { weight, type, status } = parseLabels(issue.labels || []);
-                    return (
-                      <motion.tr
-                        key={issue.id || i}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.4 + i * 0.05 }}
-                        className="hover:bg-white/5 transition"
-                      >
-                        <td className="px-4 py-3">{issue.iid}</td>
-                        <td className="px-4 py-3">{weight || "-"}</td>
-                        <td className="px-4 py-3">{type || "-"}</td>
-                        <td className="px-4 py-3">{issue.author.username || "-"}</td>
-                        <td className="px-4 py-3">{status || "-"}</td>
-                        <td className="px-4 py-3">
-                          <Acoes
-                            issue={issue}
-                            onAction={(action, data) => console.log(action, data)}
-                          />
-                        </td>
-                      </motion.tr>
-                    );
-                  })}
-                </tbody>
+                  <tbody className="divide-y divide-gray-800">
+                    {filteredIssues.map((issue, i) => {
+                      const { weight, type, status } = parseLabels(issue.labels || []);
+                      return (
+                        <motion.tr
+                          key={issue.id || i}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.4 + i * 0.05 }}
+                          className="hover:bg-white/5 transition"
+                        >
+                          <td className="px-4 py-3">{issue.iid}</td>
+                          <td className="px-4 py-3">{weight || "-"}</td>
+                          <td className="px-4 py-3">{type || "-"}</td>
+                          <td className="px-4 py-3">{issue.author.username || "-"}</td>
+                          <td className="px-4 py-3">{status || "-"}</td>
+                          <td className="px-4 py-3">
+                            <Acoes
+                              issue={issue}
+                              onAction={(action, data) => console.log(action, data)}
+                            />
+                          </td>
+                        </motion.tr>
+                      );
+                    })}
+                  </tbody>
               </table>
             )}
           </motion.div>
@@ -215,41 +269,14 @@ export default function Inicio() {
           className="w-80 flex flex-col gap-4"
         >
           <div className="bg-black/40 p-4 rounded-xl shadow-lg flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Calendar size={18} />
-              <span>01/01/2025</span>
-            </div>
-            <span className="text-gray-400">a</span>
-            <div className="flex items-center gap-2">
-              <Calendar size={18} />
-              <span>01/01/2025</span>
-            </div>
+            <DateRangePicker
+              startDate={startDate}
+              endDate={endDate}
+              onChangeStart={setStartDate}
+              onChangeEnd={setEndDate}
+            />
           </div>
-          <div className="bg-black/40 p-6 rounded-xl shadow-lg text-center">
-            <div className="text-3xl font-bold">128</div>
-            <div className="text-gray-400 text-sm">issues criadas</div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-black/40 p-6 rounded-xl shadow-lg text-center">
-              <div className="text-2xl font-bold text-orange-500">24%</div>
-              <div className="text-gray-400 text-xs">issues fechadas</div>
-            </div>
-            <div className="bg-black/40 p-6 rounded-xl shadow-lg text-center">
-              <div className="text-2xl font-bold text-orange-500">78%</div>
-              <div className="text-gray-400 text-xs">issues fechadas</div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-black/40 p-6 rounded-xl shadow-lg text-center">
-              <div className="text-2xl font-bold text-orange-500">41</div>
-              <div className="text-gray-400 text-xs">issues fechadas</div>
-            </div>
-            <div className="bg-black/40 p-6 rounded-xl shadow-lg text-center">
-              <div className="text-2xl font-bold text-orange-500">68</div>
-              <div className="text-gray-400 text-xs">issues fechadas</div>
-            </div>
-          </div>
+          <DashboardStats issues={filteredIssues} />
         </motion.div>
       </div>
     </div>

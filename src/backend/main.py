@@ -188,17 +188,19 @@ def toggle_favorite(
 
     if not fav:
         git_issue = gl.projects.get(project_id).issues.get(gitlab_id)
+        weight_value = getattr(git_issue, "weight", None)
         fav = IssueFavorite(
             gitlab_id=gitlab_id,
             project_id=project_id,
             name=git_issue.title,
             context=git_issue.description,
-            weight=str(git_issue.weight) if git_issue.weight else None,
+            weight=str(weight_value) if weight_value else None,
             favorited=True,
         )
         db.add(fav)
     else:
         fav.favorited = not fav.favorited
+
 
     db.commit()
     db.refresh(fav)

@@ -12,7 +12,7 @@ export default function Acoes({ issue, onAction }) {
   const handleAction = async (action) => {
     try {
       if (action === "favoritar") {
-        const res = await fetch(`${URL}/${issue.project_id}/${issue.iid}/favorite`, {
+        const res = await fetch(`${URL}/issues/${issue.project_id}/${issue.iid}/favorite`, {
           method: "POST",
         });
 

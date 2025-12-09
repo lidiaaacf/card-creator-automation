@@ -5,7 +5,7 @@ I created this project for learning and experimentation. As someone who works wi
 
 The dashboard functionality provides a clear overview of project issues, helping with quality assurance planning and decision-making. By combining issue creation with real-time metrics, the application allows teams to focus not just on fixing and adjusting, but also on planning and improving overall quality.
 
-## Requirements
+## Requirements 
 - Node.js >= 18
 - React 18
 - Python ≥ 3.10

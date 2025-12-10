@@ -132,3 +132,17 @@ yarn build
 ```
 
 The production-ready files will be in the `dist` folder.
+
+## Running tests
+
+#### Unit Tests 
+
+```bash
+pytest -m unit
+```
+
+#### Integration Tests
+
+```bash
+pytest -m integration
+```

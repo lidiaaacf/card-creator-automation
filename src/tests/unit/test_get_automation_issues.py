@@ -1,5 +1,7 @@
+import pytest
 from src.tests.utils.factories import make_favorite
 
+@pytest.mark.unit
 def test_get_automation_issues(client, db, mock_gitlab):
     make_favorite(db, project_id=1, gitlab_id=1, favorited=True)
     res = client.get("/get-automation-issues/?project_id=1")

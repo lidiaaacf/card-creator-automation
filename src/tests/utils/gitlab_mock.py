@@ -1,10 +1,12 @@
 class FakeIssue:
     def __init__(self, iid=1, title="Fake Issue", description="Descrição"):
         self.iid = iid
+        self.gitlab_id = iid
         self.title = title
         self.description = description
         self.attributes = {
             "iid": self.iid,
+            "gitlab_id": self.gitlab_id,
             "title": self.title,
             "description": self.description
         }

@@ -1,3 +1,6 @@
+import pytest
+
+@pytest.mark.unit
 def test_create_issue(client, mock_gitlab, mock_ai):
     payload = {
         "project": "1",

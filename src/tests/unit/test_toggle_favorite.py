@@ -1,6 +1,8 @@
 from src.tests.utils.factories import make_favorite
 from src.backend.main import IssueFavorite
+import pytest
 
+@pytest.mark.unit
 def test_toggle_favorite_creates(client, db, mock_gitlab):
     db.query(IssueFavorite).delete()
     db.commit()
@@ -9,6 +11,7 @@ def test_toggle_favorite_creates(client, db, mock_gitlab):
     assert response.status_code == 200
     assert response.json()["favorited"] is True
 
+@pytest.mark.unit
 def test_toggle_favorite_switch(client, db, mock_gitlab):
     db.query(IssueFavorite).delete()
     db.commit()

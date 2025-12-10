@@ -12,6 +12,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    env:
+      COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+
     strategy:
       matrix:
         python-version: [3.12]
